@@ -2,6 +2,10 @@ import { plainToClass } from "class-transformer";
 import { Employee } from "../entities/Employee";
 import HttpException from "../exception/HttpException";
 import { EmployeeRepository } from "../repository/EmployeeRepository";
+import bcrypt from "bcrypt";
+import jsonwebtoken from "jsonwebtoken";
+import UserNotAuthorizedException from "../exception/UserNotAuthorizedException";
+import IncorrectUsernameOrPasswordException from "../exception/IncorrectUsernameOrPasswordException";
 
 export class EmployeeService {
     constructor(
@@ -12,7 +16,9 @@ export class EmployeeService {
     }
 
     public async getEmployeeById(employeeId: string) {
-        return this.employeeRepository.getEmployeeById(employeeId);
+        const data = await this.employeeRepository.getEmployeeById(employeeId);
+        console.log(data);
+        return data;
     }
 
     public async createEmployee(employeeDetails: any) {
@@ -20,8 +26,10 @@ export class EmployeeService {
             const newEmployee = plainToClass(Employee, {
                 name: employeeDetails.name,
                 username: employeeDetails.username,
+                password: employeeDetails.password ? await bcrypt.hash(employeeDetails.password,10): '',
                 age: employeeDetails.age,
                 departmentId: employeeDetails.departmentId,
+                addressesId: employeeDetails.addressesId,
                 isActive: true,
             });
             const save = await this.employeeRepository.saveEmployeeDetails(newEmployee);
@@ -59,4 +67,35 @@ export class EmployeeService {
         // const employeeDetails = await this.employeeRepository.getEmployeeById(employeeId);
         // return this.employeeRepository.hardRemoveEmployee(employeeDetails);
     }
+    public employeeLogin = async (
+        username: string,
+        password: string
+      ) => {
+        const employeeDetails = await this.employeeRepository.getEmployeeByUsername(
+          username
+        );
+        if (!employeeDetails) {
+          throw new UserNotAuthorizedException();
+        }
+        if (await bcrypt.compare(password, employeeDetails.password)) {
+          let payload = {
+            "id": employeeDetails.id,
+            "email": employeeDetails.username,
+            "role": "admin"
+          };
+          const token = this.generateAuthTokens(payload);
+          return {
+            idToken: token,
+            employeeDetails,
+          };
+        } else {
+          throw new IncorrectUsernameOrPasswordException();
+        }
+      };
+
+      private generateAuthTokens = (payload: any)  => {
+          return jsonwebtoken.sign(payload,process.env.JWT_TOKEN_SECRET, {
+              expiresIn: process.env.ID_TOKEN_VALIDITY,
+          });
+      };
 }

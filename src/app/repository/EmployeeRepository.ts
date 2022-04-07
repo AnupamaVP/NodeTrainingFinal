@@ -9,7 +9,17 @@ export class EmployeeRepository extends Repository<Employee> {
 
     public async getEmployeeById(id: string) {
         const employeeRepo = getConnection().getRepository(Employee);
-        return employeeRepo.findOne(id);
+        // return employeeRepo.findOne(id,{relations:['addresses']});
+        const data = employeeRepo.createQueryBuilder("employee").leftJoinAndSelect("employee.addresses", "addresses").where("employee.id = :id",{id}).getOne();
+        return data;
+    }
+
+    public async getEmployeeByUsername(username:string) {
+        const employeeRepo = getConnection().getRepository(Employee);
+        const employeeDetail= await employeeRepo.findOne({
+            where:{username},
+        });
+        return employeeDetail;
     }
 
     public async saveEmployeeDetails(employeeDetails: Employee) {
